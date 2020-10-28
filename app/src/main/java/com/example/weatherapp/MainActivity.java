@@ -1,5 +1,6 @@
 package com.example.weatherapp;
 
+import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.net.Uri;
@@ -22,17 +23,17 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.BreakIterator;
 import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
 
-    private String address1;
-    private String address2;
-    private String city;
+
     private String urlStr;
+    private final String WEATHER_URL = "http://api.openweathermap.org/data/2.5/weather?q=%s&APPID=1d2fcf0922433a497b5fb9fe3e2c3742&lang=ru&units=metric";
     private String stringJSON;
     private StringBuilder textResult;
-
+    private String city;
     private EditText editTextCity;
     private TextView textViewInfo;
 
@@ -41,62 +42,41 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) actionBar.hide();
+
         editTextCity = findViewById(R.id.editTextCity);
         textViewInfo = findViewById(R.id.textViewInfo);
-        textResult = new StringBuilder();
 
-        address1 = "http://api.openweathermap.org/data/2.5/weather?q=";
-        address2 = ",ru&APPID=1d2fcf0922433a497b5fb9fe3e2c3742";
+        textResult = new StringBuilder();
 
     }
 
     public void onClickWeather(View view) {
         textViewInfo.setText("  ");
 
-        urlStr = address1 + editTextCity.getText() + address2;
-
-        Log.i("!@#", urlStr);
-
-        DoownloadTask task = new DoownloadTask();
-        try {
-            stringJSON = task.execute(urlStr).get();
-
-           if (stringJSON != null ) {
-
-                JSONObject jsonObject = new JSONObject(stringJSON);
-                String name = jsonObject.getString("name");
-                textResult.append(name + "\n");                   //имя города
-
-                JSONObject jsonObjectMain = jsonObject.getJSONObject("main");
-                String temp = jsonObjectMain.getString("temp");
-                Float tempC = Float.parseFloat(temp) - 273;
-                textResult.append("Температура " + tempC + "\n");          //текущая температура
-
-                JSONArray jsonArrayWeather = jsonObject.getJSONArray("weather");
-                JSONObject jsonObject0 = jsonArrayWeather.getJSONObject(0);
-                String naUlice = jsonObject0.getString("main");
-                textResult.append("На улице " + naUlice);
-
-                textViewInfo.setText(textResult.toString());
-           } else Toast.makeText(this, "Неверный город", Toast.LENGTH_SHORT).show();
-
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (JSONException e) {
-            e.printStackTrace();
+        //urlStr = address1 + editTextCity.getText() + address2;
+        city = editTextCity.getText().toString().trim();
+        if (!city.isEmpty()) {
+            urlStr = String.format(WEATHER_URL, city);
+            Log.i("!@#", urlStr);
+            DoownloadTask task = new DoownloadTask();
+            task.execute(urlStr);
         }
-
     }
 
-    static class DoownloadTask extends AsyncTask<String, Void, String> {
+   class DoownloadTask extends AsyncTask<String, Void, String> {
+
+
 
         @Override
         protected String doInBackground(String... strings) {
+
             URL url = null;
             HttpURLConnection urlConnection = null;
             StringBuilder strBuffer;
+
+
 
             try {
                 strBuffer = new StringBuilder();
@@ -106,7 +86,7 @@ public class MainActivity extends AppCompatActivity {
                 InputStreamReader reader = new InputStreamReader(in);
                 BufferedReader bufferedReader = new BufferedReader(reader);
                 String line = bufferedReader.readLine();
-                if (!line.equals("{\"cod\":\"404\",\"message\":\"city not found\"}") ){
+                if (!line.equals("{\"cod\":\"404\",\"message\":\"city not found\"}")) {
 
                     while (line != null) {
                         strBuffer.append(line);
@@ -114,7 +94,7 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                     return strBuffer.toString();
-                } else
+                } else    //по городу нет информации
                     return null;
 
             } catch (MalformedURLException e) {
@@ -132,8 +112,41 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(String s) {
             super.onPostExecute(s);
-            Log.i("!@#", " " + s.equals("city not found"));
-            Log.i("!@#", s);
+            String result;
+
+            if (s == null) {
+                Toast.makeText(MainActivity.this, "По данному городу информация отсутствует", Toast.LENGTH_SHORT).show();
+                return;
+            } else {
+
+                Log.i("!@#", s);
+                JSONObject jsonObject = null;
+                try {
+                    jsonObject = new JSONObject(s);
+                    String name = jsonObject.getString("name");
+                    //имя города
+
+                    String temp = jsonObject.getJSONObject("main").getString("temp");
+                    //JSONObject jsonObjectMain = jsonObject.getJSONObject("main");
+                    //String temp = jsonObjectMain.getString("temp");
+                    //текущая температура
+
+                    String naUlice = jsonObject.getJSONArray("weather").getJSONObject(0).getString("description");
+                    //JSONArray jsonArrayWeather = jsonObject.getJSONArray("weather");
+                    // JSONObject jsonObject0 = jsonArrayWeather.getJSONObject(0);
+                    // String naUlice = jsonObject0.getString("description");
+
+                    result = String.format(" %s\n Температура: %s\n На улице: %s", name, temp, naUlice);
+                    Log.i("!@#", result);
+                    textViewInfo.setText(result); //вывод данных
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+            }// enf of else
         }
+
+
     }//end of downloadTask
 }
